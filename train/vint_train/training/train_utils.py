@@ -559,11 +559,27 @@ def train_nomad(
         num_images_log: number of images to log
         use_wandb: whether to use wandb
     """
-    goal_mask_prob = torch.clip(torch.tensor(goal_mask_prob), 0, 1)
+    ##在 PyTorch 中，torch.clip 函数用于将输入张量的每个元素的值限制在指定的范围内。这行代码的作用是确保 goal_mask_prob 的值不会超出 0 到 1 的范围。如果 goal_mask_prob 的值小于 0，它会被设定为 0；如果大于 1，则会被设定为 1。这通常用于保持数据的有效性和稳定性，防止由于值超出预期范围而导致的计算错误或模型性能下降。
+    goal_mask_prob = torch.clip(torch.tensor(goal_mask_prob), 0, 1)  
     model.train()
     num_batches = len(dataloader)
+    #UC”模型或损失计算不依赖于任何特定的外部条件或目标。这意味着模型的动作输出仅基于输入数据和内部状态，而没有考虑任何额外的指导信息或目标。
+    #例如，uc_action_loss 计算模型在没有特定目标条件下的预测动作与实际动作之间的误差。
+    
+    """
+    uc_action_loss：未条件动作损失，指的是在没有给定特定条件（如目标）时，模型预测动作与实际动作之间的均方误差损失。
 
+    uc_action_waypts_cos_sim：未条件动作的逐点余弦相似度，测量模型预测的动作与实际动作在每个时间点上的方向相似性。
+
+    uc_multi_action_waypts_cos_sim：未条件动作的多点余弦相似度，是对整个动作序列预测的方向一致性的评估。
+
+    gc_dist_loss：目标条件距离损失，衡量在给定目标条件下，模型预测的距离与实际距离之间的误差。
+
+    gc_action_loss：目标条件动作损失，指的是在特定目标条件下，模型预测的动作与实际动作之间的误差。
+    
+    """
     uc_action_loss_logger = Logger("uc_action_loss", "train", window_size=print_log_freq)
+    
     uc_action_waypts_cos_sim_logger = Logger(
         "uc_action_waypts_cos_sim", "train", window_size=print_log_freq
     )
@@ -600,9 +616,17 @@ def train_nomad(
             ) = data
             
             obs_images = torch.split(obs_image, 3, dim=1)
+           
             batch_viz_obs_images = TF.resize(obs_images[-1], VISUALIZATION_IMAGE_SIZE[::-1])
             batch_viz_goal_images = TF.resize(goal_image, VISUALIZATION_IMAGE_SIZE[::-1])
             batch_obs_images = [transform(obs) for obs in obs_images]
+            """
+            torch.cat是一个PyTorch函数，用于将多个张量（在这里是变换后的图像）沿着指定的维度（dim=1）拼接。在这个上下文中，
+            dim=1通常指沿着通道维度拼接，这意味着各个图像的通道会被合并成一个单一的多通道图像。这样处理后的图像被发送到指定的设备（如 GPU）以进行更快的计算。
+            
+            transform(goal_image).to(device)
+            这行代码将变换应用于目标图像，并将其发送到计算设备。这和观察图像的处理相似，确保所有输入数据都有一致的格式和尺寸，适合模型处理。
+            """
             batch_obs_images = torch.cat(batch_obs_images, dim=1).to(device)
             batch_goal_images = transform(goal_image).to(device)
             action_mask = action_mask.to(device)
@@ -628,7 +652,15 @@ def train_nomad(
 
             # Sample noise to add to actions
             noise = torch.randn(naction.shape, device=device)
+            
+    """
+    这段代码中使用的 torch.randint 函数是用来为每个数据点随机抽取一个扩散迭代的步骤。这里，noise_scheduler.config.num_train_timesteps 表示在噪声调度器中配置的训练时的总时间步数。
 
+torch.randint(low, high, size, device=device).long()：此函数生成从low（包括）到high（不包括）之间的随机整数，size 指定了生成随机数的形状。在这里，它生成一个长度为 B（数据批次大小）的一维张量，每个元素是一个随机选取的时间步。
+.long()：这是一个类型转换方法，用于将张量中的数据类型转换为长整型（64位整数）。
+在扩散模型中，这些时间步用于指定每个数据点在扩散过程中的具体阶段，即在训练过程中，每个数据点将应用于不同的噪声级别。这样可以增加模型处理不同扩散级别的能力，从而提高模型的鲁棒性和学习效率。
+    """
+            
             # Sample a diffusion iteration for each data point
             timesteps = torch.randint(
                 0, noise_scheduler.config.num_train_timesteps,
