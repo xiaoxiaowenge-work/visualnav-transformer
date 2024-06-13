@@ -653,13 +653,13 @@ def train_nomad(
             # Sample noise to add to actions
             noise = torch.randn(naction.shape, device=device)
             
-    """
-    这段代码中使用的 torch.randint 函数是用来为每个数据点随机抽取一个扩散迭代的步骤。这里，noise_scheduler.config.num_train_timesteps 表示在噪声调度器中配置的训练时的总时间步数。
+            """
+            这段代码中使用的 torch.randint 函数是用来为每个数据点随机抽取一个扩散迭代的步骤。这里，noise_scheduler.config.num_train_timesteps 表示在噪声调度器中配置的训练时的总时间步数。
 
-torch.randint(low, high, size, device=device).long()：此函数生成从low（包括）到high（不包括）之间的随机整数，size 指定了生成随机数的形状。在这里，它生成一个长度为 B（数据批次大小）的一维张量，每个元素是一个随机选取的时间步。
-.long()：这是一个类型转换方法，用于将张量中的数据类型转换为长整型（64位整数）。
-在扩散模型中，这些时间步用于指定每个数据点在扩散过程中的具体阶段，即在训练过程中，每个数据点将应用于不同的噪声级别。这样可以增加模型处理不同扩散级别的能力，从而提高模型的鲁棒性和学习效率。
-    """
+            torch.randint(low, high, size, device=device).long()：此函数生成从low（包括）到high（不包括）之间的随机整数，size 指定了生成随机数的形状。在这里，它生成一个长度为 B（数据批次大小）的一维张量，每个元素是一个随机选取的时间步。
+            .long()：这是一个类型转换方法，用于将张量中的数据类型转换为长整型（64位整数）。
+            在扩散模型中，这些时间步用于指定每个数据点在扩散过程中的具体阶段，即在训练过程中，每个数据点将应用于不同的噪声级别。这样可以增加模型处理不同扩散级别的能力，从而提高模型的鲁棒性和学习效率。
+            """
             
             # Sample a diffusion iteration for each data point
             timesteps = torch.randint(
