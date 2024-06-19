@@ -219,23 +219,39 @@ def train_eval_loop_nomad(
                 alpha=alpha,
             )
             lr_scheduler.step()
-
+        ###
+        # ema_{epoch}.pth 
+        # 作用：这些文件保存了使用指数移动平均（EMA）策略得到的模型的状态字典。EMA通常用于稳定和改善模型在训练过程中的泛化能力。
+        # 最终用途：ema_latest.pth 存储了最后一个周期的 EMA 模型状态，通常被认为是泛化性能最好的版本，适合用于最终的模型评估和部署。
+        ###
         numbered_path = os.path.join(project_folder, f"ema_{epoch}.pth")
         torch.save(ema_model.averaged_model.state_dict(), numbered_path)
         numbered_path = os.path.join(project_folder, f"ema_latest.pth")
         print(f"Saved EMA model to {numbered_path}")
-
+        ###
+        # {epoch}.pth 和 latest.pth
+        # 作用：这些文件保存了每个训练周期结束时模型的直接状态（没有经过 EMA 处理）。latest.pth 是持续更新的，始终包含最新周期的模型状态。
+        # 最终用途：如果不使用 EMA，或者需要从特定训练点继续训练或复现结果，latest.pth 或最后一个 {epoch}.pth（如 99.pth）通常用作最终模型。
+        ###
         numbered_path = os.path.join(project_folder, f"{epoch}.pth")
         torch.save(model.state_dict(), numbered_path)
         torch.save(model.state_dict(), latest_path)
         print(f"Saved model to {numbered_path}")
-
-        # save optimizer
+         
+        ###save optimizer
+        # optimizer_latest.pth 和 optimizer_{epoch}.pth
+        # 作用：保存优化器的状态，包括所有优化参数（如学习率、动量等）。
+        # 最终用途：这些文件用于在训练中断后准确恢复优化过程，确保训练的连续性。optimizer_latest.pth 存储了最新的优化器状态。
+        #####
         numbered_path = os.path.join(project_folder, f"optimizer_{epoch}.pth")
         latest_optimizer_path = os.path.join(project_folder, f"optimizer_latest.pth")
         torch.save(optimizer.state_dict(), latest_optimizer_path)
 
         # save scheduler
+        # 4. scheduler_latest.pth 和 scheduler_{epoch}.pth
+        # 作用：保存学习率调度器的状态，包括当前学习率和内部计数器等。
+        # 最终用途：用于在训练中断后继续维持正确的学习率调整策略，scheduler_latest.pth 保存了最新的调度器状态。
+        #####
         numbered_path = os.path.join(project_folder, f"scheduler_{epoch}.pth")
         latest_scheduler_path = os.path.join(project_folder, f"scheduler_latest.pth")
         torch.save(lr_scheduler.state_dict(), latest_scheduler_path)
