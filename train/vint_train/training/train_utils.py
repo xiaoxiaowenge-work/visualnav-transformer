@@ -471,6 +471,7 @@ def _compute_losses_nomad(
         num_samples=1,
         device=device,
     )
+    ##gc 可能指的是goal condistion,   us指的是ungoal condistion 
     uc_actions = model_output_dict['uc_actions']
     gc_actions = model_output_dict['gc_actions']
     gc_distance = model_output_dict['gc_distance']
@@ -494,6 +495,8 @@ def _compute_losses_nomad(
     uc_action_waypts_cos_similairity = action_reduce(F.cosine_similarity(
         uc_actions[:, :, :2], batch_action_label[:, :, :2], dim=-1
     ))
+    ##这种平展操作的主要目的是将数据简化为一维，便于处理或输入到不同的网络层中。在这个具体例子中，平展可能是为了计算余弦相似度，
+    ##其中需要比较两个序列的相似度而不考虑它们在原始序列中的位置。
     uc_multi_action_waypts_cos_sim = action_reduce(F.cosine_similarity(
         torch.flatten(uc_actions[:, :, :2], start_dim=1),
         torch.flatten(batch_action_label[:, :, :2], start_dim=1),
@@ -563,21 +566,18 @@ def train_nomad(
     goal_mask_prob = torch.clip(torch.tensor(goal_mask_prob), 0, 1)  
     model.train()
     num_batches = len(dataloader)
-    #UC”模型或损失计算不依赖于任何特定的外部条件或目标。这意味着模型的动作输出仅基于输入数据和内部状态，而没有考虑任何额外的指导信息或目标。
-    #例如，uc_action_loss 计算模型在没有特定目标条件下的预测动作与实际动作之间的误差。
+    # """
+    # uc_action_loss：未条件动作损失，指的是在没有给定特定条件（如目标）时，模型预测动作与实际动作之间的均方误差损失。
+
+    # uc_action_waypts_cos_sim：未条件动作的逐点余弦相似度，测量模型预测的动作与实际动作在每个时间点上的方向相似性。
+
+    # uc_multi_action_waypts_cos_sim：未条件动作的多点余弦相似度，是对整个动作序列预测的方向一致性的评估。
+
+    # gc_dist_loss：目标条件距离损失，衡量在给定目标条件下，模型预测的距离与实际距离之间的误差。
+
+    # gc_action_loss：目标条件动作损失，指的是在特定目标条件下，模型预测的动作与实际动作之间的误差。
     
-    """
-    uc_action_loss：未条件动作损失，指的是在没有给定特定条件（如目标）时，模型预测动作与实际动作之间的均方误差损失。
-
-    uc_action_waypts_cos_sim：未条件动作的逐点余弦相似度，测量模型预测的动作与实际动作在每个时间点上的方向相似性。
-
-    uc_multi_action_waypts_cos_sim：未条件动作的多点余弦相似度，是对整个动作序列预测的方向一致性的评估。
-
-    gc_dist_loss：目标条件距离损失，衡量在给定目标条件下，模型预测的距离与实际距离之间的误差。
-
-    gc_action_loss：目标条件动作损失，指的是在特定目标条件下，模型预测的动作与实际动作之间的误差。
-    
-    """
+    # """
     uc_action_loss_logger = Logger("uc_action_loss", "train", window_size=print_log_freq)
     
     uc_action_waypts_cos_sim_logger = Logger(
@@ -620,20 +620,20 @@ def train_nomad(
             batch_viz_obs_images = TF.resize(obs_images[-1], VISUALIZATION_IMAGE_SIZE[::-1])
             batch_viz_goal_images = TF.resize(goal_image, VISUALIZATION_IMAGE_SIZE[::-1])
             batch_obs_images = [transform(obs) for obs in obs_images]
-            """
-            torch.cat是一个PyTorch函数，用于将多个张量（在这里是变换后的图像）沿着指定的维度（dim=1）拼接。在这个上下文中，
-            dim=1通常指沿着通道维度拼接，这意味着各个图像的通道会被合并成一个单一的多通道图像。这样处理后的图像被发送到指定的设备（如 GPU）以进行更快的计算。
+            # """
+            # torch.cat是一个PyTorch函数，用于将多个张量（在这里是变换后的图像）沿着指定的维度（dim=1）拼接。在这个上下文中，
+            # dim=1通常指沿着通道维度拼接，这意味着各个图像的通道会被合并成一个单一的多通道图像。这样处理后的图像被发送到指定的设备（如 GPU）以进行更快的计算。
             
-            transform(goal_image).to(device)
-            这行代码将变换应用于目标图像，并将其发送到计算设备。这和观察图像的处理相似，确保所有输入数据都有一致的格式和尺寸，适合模型处理。
-            """
+            # transform(goal_image).to(device)
+            # 这行代码将变换应用于目标图像，并将其发送到计算设备。这和观察图像的处理相似，确保所有输入数据都有一致的格式和尺寸，适合模型处理。
+            # """
             batch_obs_images = torch.cat(batch_obs_images, dim=1).to(device)
             batch_goal_images = transform(goal_image).to(device)
             action_mask = action_mask.to(device)
 
             B = actions.shape[0]
 
-            # Generate random goal mask
+            # Generate random goal mask   ##从论文看,是50%的概率
             goal_mask = (torch.rand((B,)) < goal_mask_prob).long().to(device)
             obsgoal_cond = model("vision_encoder", obs_img=batch_obs_images, goal_img=batch_goal_images, input_goal_mask=goal_mask)
             
@@ -645,7 +645,7 @@ def train_nomad(
             naction = from_numpy(ndeltas).to(device)
             assert naction.shape[-1] == 2, "action dim must be 2"
 
-            # Predict distance
+            # Predict distance   ##我理解dist_loss指的是时间步距离，
             dist_pred = model("dist_pred_net", obsgoal_cond=obsgoal_cond)
             dist_loss = nn.functional.mse_loss(dist_pred.squeeze(-1), distance)
             dist_loss = (dist_loss * (1 - goal_mask.float())).mean() / (1e-2 +(1 - goal_mask.float()).mean())
@@ -653,13 +653,13 @@ def train_nomad(
             # Sample noise to add to actions
             noise = torch.randn(naction.shape, device=device)
             
-            """
-            这段代码中使用的 torch.randint 函数是用来为每个数据点随机抽取一个扩散迭代的步骤。这里，noise_scheduler.config.num_train_timesteps 表示在噪声调度器中配置的训练时的总时间步数。
+            # """
+            # 这段代码中使用的 torch.randint 函数是用来为每个数据点随机抽取一个扩散迭代的步骤。这里，noise_scheduler.config.num_train_timesteps 表示在噪声调度器中配置的训练时的总时间步数。
 
-            torch.randint(low, high, size, device=device).long()：此函数生成从low（包括）到high（不包括）之间的随机整数，size 指定了生成随机数的形状。在这里，它生成一个长度为 B（数据批次大小）的一维张量，每个元素是一个随机选取的时间步。
-            .long()：这是一个类型转换方法，用于将张量中的数据类型转换为长整型（64位整数）。
-            在扩散模型中，这些时间步用于指定每个数据点在扩散过程中的具体阶段，即在训练过程中，每个数据点将应用于不同的噪声级别。这样可以增加模型处理不同扩散级别的能力，从而提高模型的鲁棒性和学习效率。
-            """
+            # torch.randint(low, high, size, device=device).long()：此函数生成从low（包括）到high（不包括）之间的随机整数，size 指定了生成随机数的形状。在这里，它生成一个长度为 B（数据批次大小）的一维张量，每个元素是一个随机选取的时间步。
+            # .long()：这是一个类型转换方法，用于将张量中的数据类型转换为长整型（64位整数）。
+            # 在扩散模型中，这些时间步用于指定每个数据点在扩散过程中的具体阶段，即在训练过程中，每个数据点将应用于不同的噪声级别。这样可以增加模型处理不同扩散级别的能力，从而提高模型的鲁棒性和学习效率。
+            # """
             
             # Sample a diffusion iteration for each data point
             timesteps = torch.randint(
@@ -681,7 +681,7 @@ def train_nomad(
                 assert unreduced_loss.shape == action_mask.shape, f"{unreduced_loss.shape} != {action_mask.shape}"
                 return (unreduced_loss * action_mask).mean() / (action_mask.mean() + 1e-2)
 
-            # L2 loss
+            # L2 loss   diffusion_loss 就相当于是action loss
             diffusion_loss = action_reduce(F.mse_loss(noise_pred, noise, reduction="none"))
             
             # Total loss

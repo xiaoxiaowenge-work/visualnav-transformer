@@ -135,6 +135,8 @@ class ViNT_Dataset(Dataset):
     def _build_caches(self, use_tqdm: bool = True):
         """
         Build a cache of images for faster loading using LMDB
+        LMDB（Lightning Memory-Mapped Database）是一个高性能的嵌入式事务型数据库，支持键值存储。它利用内存映射文件的优势，提供极快的数据访问速度，非常适用于大量数据的快速读写，
+        如机器学习和计算机视觉任务中的图像数据。LMDB 通过将整个数据库映射到内存，确保了数据的快速访问和事务的原子性。
         """
         cache_filename = os.path.join(
             self.data_split_folder,
@@ -146,7 +148,9 @@ class ViNT_Dataset(Dataset):
             self._get_trajectory(traj_name)
 
         """
-        If the cache file doesn't exist, create it by iterating through the dataset and writing each image to the cache
+        #!If the cache file doesn't exist, create it by iterating through the dataset and writing each image to the cache
+        #!self.goals_index：这是传递给 tqdm.tqdm 的可迭代对象。self.goals_index 是一个包含元组 (traj_name, goal_time) 的列表，每个元组代表一个轨迹名和时间步。
+        #!dynamic_ncols=True：该参数控制进度条的宽度是否动态调整。dynamic_ncols=True 表示进度条的宽度将根据终端窗口的宽度自动调整，以适应终端的大小。
         """
         if not os.path.exists(cache_filename):
             tqdm_iterator = tqdm.tqdm(
@@ -284,7 +288,12 @@ class ViNT_Dataset(Dataset):
 
     def __len__(self) -> int:
         return len(self.index_to_data)
-
+    
+    #!这个函数真正调用的时候是在train/vint_train/training/train_utils.py
+    #! 
+    #! with tqdm.tqdm(dataloader, desc="Train Batch", leave=False) as tepoch:
+    #!     for i, data in enumerate(tepoch):
+    #!
     def __getitem__(self, i: int) -> Tuple[torch.Tensor]:
         """
         Args:

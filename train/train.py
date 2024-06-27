@@ -120,9 +120,10 @@ def main(config):
                             test_dataloaders[dataset_type] = {}
                         test_dataloaders[dataset_type] = dataset
 
-    # combine all the datasets from different robots
+    #!combine all the datasets from different robots
+    #!ConcatDataset 是 PyTorch 中的一个标准类，用于将多个数据集连接在一起。它在 torch.utils.data 模块中定义，可以用于组合来自不同数据集的数据，
     train_dataset = ConcatDataset(train_dataset)
-
+    #!DataLoader 是 PyTorch 中一个非常重要的类，用于批量加载数据，尤其是在训练神经网络时。它能够对数据进行分批处理、打乱顺序、并行加载等。以下是 DataLoader 的参数及其功能详细解释
     train_loader = DataLoader(
         train_dataset,
         batch_size=config["batch_size"],
@@ -131,7 +132,7 @@ def main(config):
         drop_last=False,
         persistent_workers=True,
     )
-
+    #!eval_batch_size 不存在， batch_size = 256
     if "eval_batch_size" not in config:
         config["eval_batch_size"] = config["batch_size"]
 
