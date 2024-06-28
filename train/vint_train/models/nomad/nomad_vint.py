@@ -100,6 +100,9 @@ class NoMaD_ViNT(nn.Module):
             goal_mask = input_goal_mask.to(device)
 
         # Get the goal encoding
+        #!obs_img[:, 3*self.context_size:, :, :] 提取从第 9 个通道到最后一个通道的所有数据。  nomad中self.context_size的个数设置为3，上下文图片的个数，vint=5
+        #!我理解obs_img 加上当前图片是4个，3+1， 那么通道的话是12个，3*self.context_size: 这个代表最后一个图片，也就是当前图片
+        #!当前图片和目标图片堆叠后就是新的目标图片
         obsgoal_img = torch.cat([obs_img[:, 3*self.context_size:, :, :], goal_img], dim=1) # concatenate the obs image/context and goal image --> non image goal?
         obsgoal_encoding = self.goal_encoder.extract_features(obsgoal_img) # get encoding of this img 
         obsgoal_encoding = self.goal_encoder._avg_pooling(obsgoal_encoding) # avg pooling 
